@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Fast QR Reader iOS Fix Test</title>
+  <title>Fast QR Reader</title>
 
   <style>
     :root {
@@ -75,10 +75,9 @@
     }
 
     /*
-      iOS切り分け用の重要変更:
-      coverではなくcontainにして、video.videoWidth / video.videoHeight の
-      全フレームが表示領域内に必ず収まるようにする。
-      これによりobject-fit:cover由来のクロップ座標変換を避ける。
+      iOS Safariを含む実カメラ運用ではcontainを使用し、
+      video.videoWidth / video.videoHeight の全フレームを表示領域内に収める。
+      coverクロップによる表示座標と映像座標のずれを避ける。
     */
     video {
       display: block;
@@ -281,7 +280,7 @@
   </dl>
 
   <p class="note">
-    iOS切り分け版：coverクロップを使わず、映像全体をcontain表示して座標変換の影響を減らしています。
+    iOS Safari対応：映像全体をcontain表示し、ZXing WASMで安定した読み取りを優先しています。
   </p>
 
   <p id="error" role="alert" hidden></p>
@@ -327,14 +326,13 @@ document.addEventListener('DOMContentLoaded', () => {
     targetElement: $('target'),
 
     /*
-      iPhone実機での切り分けを優先。
-      ZXing WASMを明示してデコーダー分岐を固定。
+      iOS Safariを含む実カメラでの安定性を優先し、
+      ZXing WASMを明示してデコーダー分岐を固定する。
     */
     decoder: 'zxing',
 
     /*
-      既存値より少しだけ高精細側へ寄せる。
-      極端に負荷を上げず、小さい/斜めQRの救済率を上げる。
+      負荷を極端に上げず、小さい/斜めQRの救済率を確保する。
     */
     scanIntervalMs: 65,
     fullScanIntervalMs: 220,
