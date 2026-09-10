@@ -280,7 +280,7 @@
   </dl>
 
   <p class="note">
-    iOS Safari対応：映像全体をcontain表示し、ZXing WASMで安定した読み取りを優先しています。
+    iOS Safari対応：連続フレーム読取を修正し、ZXing WASMで安定した読み取りを優先しています。
   </p>
 
   <p id="error" role="alert" hidden></p>
@@ -321,8 +321,54 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  /*
+    iOS Safari連続読取修正:
+    FastQRReader本体はrequestVideoFrameCallbackのmetadata.mediaTimeを
+    「同じ映像フレームを二重処理しない」判定に使う。
+    一部iPhone SafariではmediaTimeが連続コールバックで更新されず、
+    初回だけ読んだ後の全フレームが同一扱いになる場合がある。
+
+    rVFC自体は新しい表示フレーム通知として使い続けつつ、
+    FastQRReaderへ渡すmediaTimeだけをコールバックごとに単調増加させる。
+    cancelVideoFrameCallbackのハンドルはネイティブ値をそのまま返す。
+  */
+  const video = $('video');
+
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    const nativeRequestVideoFrameCallback =
+      video.requestVideoFrameCallback.bind(video);
+
+    let frameSerial = 0;
+
+    try {
+      Object.defineProperty(video, 'requestVideoFrameCallback', {
+        configurable: true,
+        value(callback) {
+          return nativeRequestVideoFrameCallback((timestamp, metadata) => {
+            frameSerial += 1;
+
+            const fixedMetadata = Object.create(metadata || null);
+            Object.defineProperty(fixedMetadata, 'mediaTime', {
+              configurable: true,
+              enumerable: true,
+              value: frameSerial
+            });
+
+            callback(timestamp, fixedMetadata);
+          });
+        }
+      });
+    } catch (error) {
+      /*
+        own propertyで上書きできないブラウザでは、既存実装をそのまま使う。
+        その場合もページ自体は起動可能。
+      */
+      console.warn('requestVideoFrameCallback patch failed', error);
+    }
+  }
+
   const reader = new FastQRReader({
-    video: $('video'),
+    video,
     targetElement: $('target'),
 
     /*
