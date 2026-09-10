@@ -2,127 +2,448 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#101619">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Fast QR Reader</title>
+  <title>Fast QR Reader iOS Fix Test</title>
+
   <style>
-    :root { color-scheme:dark; font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:#101619; color:#edf5f1; }
-    * { box-sizing:border-box; }
-    body { margin:0; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-    main { max-width:680px; min-height:100vh; min-height:100svh; margin:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
-    header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-    h1 { margin:0; font-size:18px; letter-spacing:.02em; }
-    #status { margin:0; color:#aebdb7; font-size:13px; }
-    .camera { position:relative; overflow:hidden; border:1px solid #34433e; border-radius:18px; background:#080d0b; height:55vh; height:clamp(230px,55svh,550px); min-height:230px; }
-    video { display:block; width:100%; height:100%; object-fit:cover; object-position:50% 50%; padding:0; border:0; }
-    #target { position:absolute; left:50%; top:50%; width:min(58%,250px); aspect-ratio:1; transform:translate(-50%,-50%); border:2px solid #8fedd0; border-radius:15px; pointer-events:none; }
-    #target::before,#target::after { content:""; position:absolute; background:#8fedd0; opacity:.65; top:50%; left:50%; transform:translate(-50%,-50%); }
-    #target::before { width:16px; height:1px; }
-    #target::after { width:1px; height:16px; }
-    #target.hit { border-color:#fff; box-shadow:0 0 0 5px #8fedd02b; }
-    .controls { display:flex; gap:10px; }
-    button { appearance:none; flex:1; border:1px solid #52695f; border-radius:12px; padding:12px 16px; min-height:48px; font:inherit; font-weight:600; touch-action:manipulation; cursor:pointer; color:#edf5f1; background:#1e2a25; }
-    #start { background:#8fedd0; color:#082a20; border-color:#8fedd0; }
-    button:disabled { opacity:.38; cursor:default; }
-    button:focus-visible { outline:3px solid white; outline-offset:3px; }
-    .result { min-height:100px; background:#19231f; border:1px solid #34433e; border-radius:14px; padding:16px; }
-    .label { margin:0 0 8px; font-size:12px; letter-spacing:.04em; color:#aebdb7; }
-    #result { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; font-size:18px; }
-    dl { display:flex; margin:0; gap:24px; padding:0 2px; }
-    dl div { flex:1; }
-    dt { color:#aebdb7; font-size:12px; }
-    dd { margin:2px 0 0; font:14px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; font-variant-numeric:tabular-nums; }
-    #error { margin:0; color:#ffc1b9; font-size:14px; overflow-wrap:anywhere; }
-    @media (orientation:landscape) and (max-height:520px) {
-      main { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:12px 18px; }
-      header { grid-column:1/-1; }
-      .camera { grid-row:2/6; height:calc(100svh - 100px); min-height:220px; }
-      .controls { align-self:start; }
-      .result { min-width:0; }
+    :root {
+      color-scheme: dark;
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101619;
+      color: #edf5f1;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overscroll-behavior: none;
+    }
+
+    body {
+      padding:
+        env(safe-area-inset-top)
+        env(safe-area-inset-right)
+        env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
+      touch-action: manipulation;
+    }
+
+    main {
+      max-width: 680px;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .02em;
+    }
+
+    #status {
+      margin: 0;
+      color: #aebdb7;
+      font-size: 13px;
+    }
+
+    .camera {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #34433e;
+      border-radius: 18px;
+      background: #080d0b;
+      height: clamp(230px, 55svh, 550px);
+      min-height: 230px;
+    }
+
+    /*
+      iOS切り分け用の重要変更:
+      coverではなくcontainにして、video.videoWidth / video.videoHeight の
+      全フレームが表示領域内に必ず収まるようにする。
+      これによりobject-fit:cover由来のクロップ座標変換を避ける。
+    */
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: 50% 50%;
+      padding: 0;
+      border: 0;
+      background: #000;
+    }
+
+    #target {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(58%, 250px);
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border: 2px solid #8fedd0;
+      border-radius: 15px;
+      pointer-events: none;
+    }
+
+    #target::before,
+    #target::after {
+      content: "";
+      position: absolute;
+      background: #8fedd0;
+      opacity: .65;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #target::before { width: 16px; height: 1px; }
+    #target::after  { width: 1px; height: 16px; }
+
+    #target.hit {
+      border-color: #fff;
+      box-shadow: 0 0 0 5px #8fedd02b;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      flex: 1;
+      border: 1px solid #52695f;
+      border-radius: 12px;
+      padding: 12px 16px;
+      min-height: 48px;
+      font: inherit;
+      font-weight: 600;
+      touch-action: manipulation;
+      cursor: pointer;
+      color: #edf5f1;
+      background: #1e2a25;
+    }
+
+    #start {
+      background: #8fedd0;
+      color: #082a20;
+      border-color: #8fedd0;
+    }
+
+    button:disabled {
+      opacity: .38;
+      cursor: default;
+    }
+
+    .result {
+      min-height: 100px;
+      background: #19231f;
+      border: 1px solid #34433e;
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .label {
+      margin: 0 0 8px;
+      font-size: 12px;
+      letter-spacing: .04em;
+      color: #aebdb7;
+    }
+
+    #result {
+      margin: 0;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      font-size: 18px;
+    }
+
+    dl {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 24px;
+      margin: 0;
+      padding: 0 2px;
+    }
+
+    dt {
+      color: #aebdb7;
+      font-size: 12px;
+    }
+
+    dd {
+      margin: 2px 0 0;
+      font: 14px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    #error {
+      margin: 0;
+      color: #ffc1b9;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .note {
+      margin: 0;
+      color: #aebdb7;
+      font-size: 12px;
+    }
+
+    @media (orientation: landscape) and (max-height: 520px) {
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        gap: 12px 18px;
+      }
+
+      header { grid-column: 1 / -1; }
+
+      .camera {
+        grid-row: 2 / 7;
+        height: calc(100svh - 100px);
+        min-height: 220px;
+      }
+
+      .controls { align-self: start; }
+      .result { min-width: 0; }
     }
   </style>
+
   <script src="./fast-qr-reader.js" defer></script>
 </head>
+
 <body>
 <main>
-  <header><h1>Fast QR Reader</h1><p id="status" role="status">準備中</p></header>
+  <header>
+    <h1>Fast QR Reader</h1>
+    <p id="status" role="status">準備中</p>
+  </header>
+
   <div class="camera">
     <video id="video" autoplay muted playsinline aria-label="カメラ映像"></video>
     <div id="target" aria-hidden="true"></div>
   </div>
+
   <div class="controls">
     <button id="start" type="button" disabled>読み取り開始</button>
     <button id="stop" type="button" disabled>停止</button>
   </div>
+
   <section class="result" aria-label="認識結果">
     <p class="label">認識結果</p>
     <p id="result" aria-live="polite" aria-atomic="true">QRコードを中央へ</p>
   </section>
+
   <dl>
-    <div><dt>decoder</dt><dd id="decoder">—</dd></div>
-    <div><dt>処理時間 / 1回</dt><dd id="time">— ms</dd></div>
+    <div>
+      <dt>decoder</dt>
+      <dd id="decoder">—</dd>
+    </div>
+    <div>
+      <dt>処理時間 / 1回</dt>
+      <dd id="time">— ms</dd>
+    </div>
+    <div>
+      <dt>region / candidates</dt>
+      <dd id="region">—</dd>
+    </div>
+    <div>
+      <dt>scan image</dt>
+      <dd id="scanSize">—</dd>
+    </div>
+    <div>
+      <dt>video frame</dt>
+      <dd id="videoSize">—</dd>
+    </div>
+    <div>
+      <dt>表示方式</dt>
+      <dd>object-fit: contain</dd>
+    </div>
   </dl>
+
+  <p class="note">
+    iOS切り分け版：coverクロップを使わず、映像全体をcontain表示して座標変換の影響を減らしています。
+  </p>
+
   <p id="error" role="alert" hidden></p>
 </main>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
-  let flashTimer, lastStats = -Infinity;
+
+  let flashTimer;
+  let lastStats = -Infinity;
+
   function showError(error) {
-    if (error.name === 'AbortError') return;
+    if (error?.name === 'AbortError') return;
+
     const messages = {
-      NotAllowedError:'カメラの使用を許可してください。拒否した場合はSafari・ブラウザのサイト設定を確認してください。',
-      NotFoundError:'使用できるカメラが見つかりません。',
-      NotReadableError:'カメラを使用できません。他のアプリのカメラを閉じて再度お試しください。',
-      OverconstrainedError:'カメラの設定に対応していません。'
+      NotAllowedError:
+        'カメラの使用を許可してください。拒否した場合はSafari・ブラウザのサイト設定を確認してください。',
+      NotFoundError:
+        '使用できるカメラが見つかりません。',
+      NotReadableError:
+        'カメラを使用できません。他のアプリのカメラを閉じて再度お試しください。',
+      OverconstrainedError:
+        'カメラの設定に対応していません。'
     };
-    $('error').textContent = messages[error.name] || error.message;
+
+    $('error').textContent =
+      messages[error?.name] || error?.message || String(error);
+
     $('error').hidden = false;
   }
+
   if (typeof FastQRReader === 'undefined') {
-    showError(new Error('fast-qr-reader.jsをindex.htmlと同じフォルダに置いてください。'));
+    showError(new Error(
+      'fast-qr-reader.jsをindex.htmlと同じフォルダに置いてください。'
+    ));
     $('start').disabled = true;
     return;
   }
+
   const reader = new FastQRReader({
-    video:$('video'), targetElement:$('target'),
+    video: $('video'),
+    targetElement: $('target'),
+
+    /*
+      iPhone実機での切り分けを優先。
+      ZXing WASMを明示してデコーダー分岐を固定。
+    */
+    decoder: 'zxing',
+
+    /*
+      既存値より少しだけ高精細側へ寄せる。
+      極端に負荷を上げず、小さい/斜めQRの救済率を上げる。
+    */
+    scanIntervalMs: 65,
+    fullScanIntervalMs: 220,
+    fastSize: 640,
+    detailSize: 960,
+    wideSize: 960,
+    fullSize: 1280,
+    fullDetailSize: 1600,
+
+    videoConstraints: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30, max: 30 }
+    },
+
     onDetected(result) {
-      // QR text is untrusted data: never render it as HTML or open it automatically.
-      $('result').textContent = result.text === '' ? '（空の文字列）' : result.text;
+      $('result').textContent =
+        result.text === '' ? '（空の文字列）' : result.text;
+
       $('target').classList.add('hit');
       clearTimeout(flashTimer);
-      flashTimer = setTimeout(() => $('target').classList.remove('hit'), 180);
+      flashTimer = setTimeout(
+        () => $('target').classList.remove('hit'),
+        180
+      );
     },
+
     onScan(stats) {
-      if (performance.now() - lastStats < 200) return;
+      if (performance.now() - lastStats < 120) return;
       lastStats = performance.now();
-      $('decoder').textContent = stats.decoder;
-      $('time').textContent = stats.processingTimeMs.toFixed(1) + ' ms';
+
+      $('decoder').textContent = stats.decoder || '—';
+
+      $('time').textContent =
+        Number.isFinite(stats.processingTimeMs)
+          ? stats.processingTimeMs.toFixed(1) + ' ms'
+          : '—';
+
+      $('region').textContent =
+        `${stats.region || '—'} / ${stats.candidates ?? '—'}`;
+
+      $('scanSize').textContent =
+        Number.isFinite(stats.width) && Number.isFinite(stats.height)
+          ? `${stats.width} × ${stats.height}`
+          : '—';
+
+      $('videoSize').textContent =
+        $('video').videoWidth && $('video').videoHeight
+          ? `${$('video').videoWidth} × ${$('video').videoHeight}`
+          : '—';
     },
+
     onStateChange(state) {
-      $('status').textContent = { starting:'起動中', running:'読み取り中', paused:'一時停止中', stopped:'停止中' }[state] || state;
-      $('start').disabled = state === 'starting' || state === 'running';
-      $('stop').disabled = state === 'stopped';
-      if (state === 'running') $('decoder').textContent = reader.decoder;
+      $('status').textContent = {
+        starting: '起動中',
+        running: '読み取り中',
+        paused: '一時停止中',
+        stopped: '停止中'
+      }[state] || state;
+
+      $('start').disabled =
+        state === 'starting' || state === 'running';
+
+      $('stop').disabled =
+        state === 'stopped';
+
+      if (state === 'running') {
+        $('decoder').textContent = reader.decoder || '—';
+
+        $('videoSize').textContent =
+          $('video').videoWidth && $('video').videoHeight
+            ? `${$('video').videoWidth} × ${$('video').videoHeight}`
+            : '—';
+      }
     },
-    onError:showError
+
+    onError: showError
   });
-  // Console access is useful for checking reset() / allowDuplicate(true).
+
   window.reader = reader;
+
   $('status').textContent = '停止中';
   $('start').disabled = false;
+
   $('start').addEventListener('click', async () => {
     $('error').hidden = true;
-    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-      showError(new Error('この2ファイルをHTTPSで配信して開いてください。PCでの確認はlocalhostも利用できます。'));
+    $('result').textContent = 'QRコードを中央へ';
+
+    if (
+      !window.isSecureContext ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      showError(new Error(
+        'HTTPSで配信して開いてください。PCではlocalhostも利用できます。'
+      ));
       return;
     }
-    try { await reader.start(); } catch (error) { showError(error); }
+
+    try {
+      await reader.start();
+    } catch (error) {
+      showError(error);
+    }
   });
-  $('stop').addEventListener('click', () => reader.stop());
+
+  $('stop').addEventListener('click', () => {
+    reader.stop();
+  });
 });
 </script>
 </body>
