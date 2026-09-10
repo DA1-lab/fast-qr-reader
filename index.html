@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Fast QR Reader</title>
+  <title>Fast QR Reader v0.4</title>
 
   <style>
     :root {
@@ -56,6 +56,16 @@
       margin: 0;
       font-size: 18px;
       letter-spacing: .02em;
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+    }
+
+    .version {
+      color: #8fedd0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .03em;
     }
 
     #status {
@@ -75,15 +85,15 @@
     }
 
     /*
-      iOS Safariを含む実カメラ運用ではcontainを使用し、
-      video.videoWidth / video.videoHeight の全フレームを表示領域内に収める。
-      coverクロップによる表示座標と映像座標のずれを避ける。
+      v0.4:
+      カメラ映像をcover表示して左右の黒帯をなくす。
+      連続読取停止対策はrequestVideoFrameCallback側で維持する。
     */
     video {
       display: block;
       width: 100%;
       height: 100%;
-      object-fit: contain;
+      object-fit: cover;
       object-position: 50% 50%;
       padding: 0;
       border: 0;
@@ -233,7 +243,7 @@
 <body>
 <main>
   <header>
-    <h1>Fast QR Reader</h1>
+    <h1>Fast QR Reader <span class="version">v0.4</span></h1>
     <p id="status" role="status">準備中</p>
   </header>
 
@@ -275,12 +285,12 @@
     </div>
     <div>
       <dt>表示方式</dt>
-      <dd>object-fit: contain</dd>
+      <dd>object-fit: cover</dd>
     </div>
   </dl>
 
   <p class="note">
-    iOS Safari対応：連続フレーム読取を修正し、ZXing WASMで安定した読み取りを優先しています。
+    v0.4：連続読取修正を維持し、カメラを全画面表示。読取成功時に短い確認音を鳴らします。
   </p>
 
   <p id="error" role="alert" hidden></p>
@@ -292,6 +302,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let flashTimer;
   let lastStats = -Infinity;
+  let audioContext = null;
+
+  function prepareAudio() {
+    if (!audioContext) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      audioContext = new AudioContextClass();
+    }
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume().catch(() => {});
+    }
+  }
+
+  function beep() {
+    if (!audioContext || audioContext.state !== 'running') return;
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const t = audioContext.currentTime;
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(920, t);
+
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.12, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start(t);
+    oscillator.stop(t + 0.06);
+  }
 
   function showError(error) {
     if (error?.name === 'AbortError') return;
@@ -399,6 +443,8 @@ document.addEventListener('DOMContentLoaded', () => {
       $('result').textContent =
         result.text === '' ? '（空の文字列）' : result.text;
 
+      beep();
+
       $('target').classList.add('hit');
       clearTimeout(flashTimer);
       flashTimer = setTimeout(
@@ -467,6 +513,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('start').addEventListener('click', async () => {
     $('error').hidden = true;
     $('result').textContent = 'QRコードを中央へ';
+
+    // iOS Safariではユーザー操作中にAudioContextを開始しておく。
+    prepareAudio();
 
     if (
       !window.isSecureContext ||
